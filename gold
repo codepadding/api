@@ -1,0 +1,123 @@
+import MetaTrader5 as mt5
+import time
+import pandas as pd
+# import socketio
+import json
+from socketio import Client
+
+sio = Client()
+
+
+def market_info(symbol):
+    rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_D1, 0, 1)
+    rates_frame = pd.DataFrame(rates)
+    rates_frame['time'] = pd.to_datetime(rates_frame['time'], unit='s')
+    high = rates_frame['high'][0]
+    low = rates_frame['low'][0]
+    open = rates_frame['open'][0]
+    close = rates_frame['close'][0]
+    return high, low, open, close
+
+def ask_bid(symbol):
+    tick = mt5.symbol_info_tick(symbol)
+    tick_info_dict = tick._asdict()
+    bid = tick_info_dict['bid']
+    ask = tick_info_dict['ask']
+    return bid, ask
+
+def gold_price():
+    symbol = "XAUUSD"
+    high, low, open, close = market_info(symbol)
+    bid, ask = ask_bid(symbol)
+    __24K = ask/31.1034768
+    __22K = ask/31.1034768 * 0.95
+    __21K = ask/31.1034768 * 0.9
+    __20K = ask/31.1034768 * 0.85
+    return __24K, __22K, __21K, __20K, bid, ask, open, close, low, high
+
+def sliver_price():
+    symbol = "XAGUSD"
+    high, low, open, close = market_info(symbol)
+    bid, ask = ask_bid(symbol)
+    __24K = ask/31.1034768
+    __22K = ask/31.1034768 * 0.95
+    __21K = ask/31.1034768 * 0.9
+    __20K = ask/31.1034768 * 0.85
+    print(__24K, __22K, __21K, __20K, bid, ask, open, close, low, high)
+    return __24K, __22K, __21K, __20K, bid, ask, open, close, low, high
+
+def start_loop():
+        print("starting work")
+        try:
+            while True:
+                __24K, __22K, __21K, __20K, bid, ask, open, close, low, high = gold_price()
+                json_data = json.dumps({
+                    "type": "gold_update",
+                    "message": " Gold Price Update",
+                    "data": {
+                        "gold": {
+                            "k24": __24K,
+                            "k22": __22K,
+                            "k21": __21K,
+                            "k20": __20K,
+                            "bid" : bid,
+                            "ask" : ask,
+                            "open" : open,
+                            "close" : close,
+                            "min" : low,
+                            "max" : high
+                        },
+                        "dollor": {
+                            "24K": __24K,
+                            "22K": __22K,
+                            "21K": __21K,
+                            "20K": __20K
+                        },
+                        "gold_tick": {
+                            "bid": bid,
+                            "ask": ask,
+                            "open": open,
+                            "close": close,
+                            "min": low,
+                            "max": high
+                        },
+                        "today": {
+                            "bid": bid,
+                            "ask": ask,
+                            "open": open,
+                            "close": close,
+                            "min": low,
+                            "max": high
+                        },
+                    }
+                })
+                sio.emit('gold_price_update_from_py', json_data)
+                time.sleep(.1)
+        except Exception as e:
+            print(e)
+            time.sleep(10)
+            start_loop()
+
+
+
+
+def main():
+    if not mt5.initialize():
+        print("initialize() failed, error code =", mt5.last_error())
+
+    sio.connect('https://api.goldpriceupdate.com?secret_key=admin_secret_key')
+    start_loop()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as e:
+        print(e)
+        time.sleep(10)
+        main()
+
+
+
+        
+    
